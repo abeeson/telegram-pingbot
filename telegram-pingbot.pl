@@ -35,9 +35,19 @@ print $cgi->header(-type => "text/html", -charset => "utf-8");
 print "<html><body><p>$botname collected $data</p></body></html>"; 
 
 sub send_ping {
-	# Pull the ping from the sub input
+	# Pull the sending chat_id and ping from the sub input
+	my $chat_id = shift;
 	my $ping = shift;
-	
+
+	# Check if the user is blocked from sending pings
+	if (check_ping_auth($chat_id) eq 1) {
+		# And send them a message telling them that if they are
+        	send_message($chat_id,"Sorry you are currently blocked from sending pings");
+
+		# Then return without sending the ping
+		return;
+	}
+
 	# Load the user list from the DB
 	my %users = load_users();
 
@@ -145,7 +155,7 @@ sub check_updates {
 		$ping .= "\nsent ". $date . "\n-------------------";
 
 		# Pass the ping to send_ping to be sent to everybody
-		send_ping($ping);
+		send_ping($message->{"message"}->{"chat"}->{"id"},$ping);
 	}
 }
 
@@ -167,7 +177,7 @@ sub add_new_user {
         my $dbh = DBI->connect($ds, $dbuser, $dbpass) || die "DBI::errstr";
 
 	# Set up a select to pull the record with that username
-        my $query = $dbh->prepare("select * from pingbot_users where user = '$user'") || die "DBI::errstr";
+        my $query = $dbh->prepare("select user,chat_id from pingbot_users where user = '$user'") || die "DBI::errstr";
         $query->execute();
         $query->bind_columns(\$db_user,\$db_chat_id);
 
@@ -193,4 +203,26 @@ sub add_new_user {
 		# Send back a message saying user not found
         	send_message($chat_id,"No user found with that username, please try again");
         }
+}
+
+sub check_ping_auth {
+        use DBI;
+
+	# Pull chat_id in from sub input
+	my $chat_id = shift;
+
+	my $blocked = "";
+	
+        # Get the datasource
+        my $ds = get_datasource();
+
+        # Connect to the DB
+        my $dbh = DBI->connect($ds, $dbuser, $dbpass) || die "DBI::errstr";
+
+	# Set up a select to pull the record with that username
+        my $query = $dbh->prepare("select blocked from pingbot_users where chat_id = '$chat_id'") || die "DBI::errstr";
+        $query->execute();
+        $query->bind_columns(\$blocked);
+
+	return $blocked;
 }
