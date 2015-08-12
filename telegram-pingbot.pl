@@ -40,7 +40,7 @@ sub send_ping {
 	my $ping = shift;
 
 	# Check if the user is blocked from sending pings
-	if (check_ping_auth($chat_id) eq 1) {
+	if (check_ping_auth($chat_id)) {
 		# And send them a message telling them that if they are
         	send_message($chat_id,"Sorry you are currently blocked from sending pings");
 
@@ -57,6 +57,32 @@ sub send_ping {
 		next if $users{$user} == 0;
 		send_message($users{$user},$ping);
 	}
+}
+
+sub send_test_ping {
+        # Pull the sending chat_id and ping from the sub input
+        my $chat_id = shift;
+        my $ping = shift;
+
+        # Check if the user is blocked from sending pings
+        if (check_ping_auth($chat_id)) {
+                # And send them a message telling them that if they are
+                send_message($chat_id,"Sorry you are currently blocked from sending pings");
+
+                # Then return without sending the ping
+                return;
+        }
+
+        # Load the user list from the DB
+        my %users = load_users();
+
+        # Loop through the user list pulling chat ID's and pushing them to the send_message sub to be sent
+        foreach my $user (keys %users) {
+                # Skip if the user has no chat_id (not subscribed yet)
+                next if $users{$user} == 0;
+                next if $user ne "Lucian Thorundan";
+                send_message($users{$user},$ping);
+        }
 }
 
 sub get_datasource {
@@ -157,6 +183,24 @@ sub check_updates {
 		# Pass the ping to send_ping to be sent to everybody
 		send_ping($message->{"message"}->{"chat"}->{"id"},$ping);
 	}
+
+        # Check if the message starts with /test
+        if ($message->{"message"}->{"text"} =~ m/\/test\s(.*)/) {
+                # Pull the current time and date from unix date in UTC
+                my $date = `date +"%Y-%M-%d %H:%M:%S %:z(%Z)" -u`;
+
+                # Chomp date to remove the newline
+                chomp $date;
+
+                # Create the ping string from the requested ping, plus the date and user + some formatting
+                # This uses the reverse user list to translate chat_id -> username
+                my $ping = $1;
+                $ping .= "\n-------------------\nping from ".$rusers{$message->{"message"}->{"chat"}->{"id"}};
+                $ping .= "\nsent ". $date . "\n-------------------";
+
+                # Pass the ping to send_ping to be sent to everybody
+                send_test_ping($message->{"message"}->{"chat"}->{"id"},$ping);
+        }
 }
 
 sub add_new_user {
@@ -223,6 +267,9 @@ sub check_ping_auth {
         my $query = $dbh->prepare("select blocked from pingbot_users where chat_id = '$chat_id'") || die "DBI::errstr";
         $query->execute();
         $query->bind_columns(\$blocked);
+
+	# Fetch the row data (only done once as there should only be a single user with this name)
+        $query->fetch();
 
 	return $blocked;
 }
