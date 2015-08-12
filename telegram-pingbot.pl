@@ -123,12 +123,12 @@ sub add_new_user {
         
         if ($db_user eq $user) {
         	if ($db_chat_id == "0") {
-        		send_message($chat_id,"Welcome to the HOSDOT ping bot. You are now subscribed to our ping service");
+        		send_message($chat_id,"Welcome to the $botname ping bot. You are now subscribed to our ping service");
         		$query = $dbh->prepare("UPDATE pingbot_users SET chat_id = '$chat_id' where user = '$user'") || die "DBI::errstr";
         		$query->execute();
         		
         	} else {
-        		send_message($chat_id,"That user is already subscribed to the HOSDOT ping service");
+        		send_message($chat_id,"That user is already subscribed to the $botname ping service");
         	}
         } else {
         	send_message($chat_id,"No user found with that username, please try again");
